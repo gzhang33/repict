@@ -1,4 +1,5 @@
 import argparse
+import base64
 import io
 import sys
 import zipfile
@@ -77,6 +78,22 @@ def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
     return full
 
 
+# Inline ZIP in the upload HTML avoids a second HTTP request (needed on serverless
+# where /tmp may not exist on a different instance than /upload).
+MAX_INLINE_ZIP_BYTES = 4 * 1024 * 1024
+
+
+def build_zip_bytes(output_dir: Path, relpaths: list[str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for rel in relpaths:
+            path = resolve_output_file(output_dir, rel.strip())
+            if path is None:
+                continue
+            zf.write(path, arcname=Path(rel.strip()).as_posix())
+    return buffer.getvalue()
+
+
 def create_app(output_dir: Path) -> Flask:
     # Use absolute paths for templates and static files
     web_dir = Path(__file__).parent
@@ -95,6 +112,8 @@ def create_app(output_dir: Path) -> Flask:
             summary=None,
             output_dir=str(output_dir),
             zip_relpaths=[],
+            inline_zip_b64=None,
+            zip_fallback_only=False,
         )
 
     @app.post("/upload")
@@ -206,12 +225,23 @@ def create_app(output_dir: Path) -> Flask:
             )
         ]
 
+        inline_zip_b64: str | None = None
+        zip_fallback_only = False
+        if zip_relpaths:
+            zdata = build_zip_bytes(output_dir, zip_relpaths)
+            if len(zdata) <= MAX_INLINE_ZIP_BYTES:
+                inline_zip_b64 = base64.b64encode(zdata).decode("ascii")
+            else:
+                zip_fallback_only = True
+
         return render_template(
             "index.html",
             results=results,
             summary=summary,
             output_dir=str(output_dir),
             zip_relpaths=zip_relpaths,
+            inline_zip_b64=inline_zip_b64,
+            zip_fallback_only=zip_fallback_only,
         )
 
     @app.get("/download/<path:relative_path>")
@@ -231,19 +261,10 @@ def create_app(output_dir: Path) -> Flask:
         paths = request.form.getlist("paths")
         if not paths:
             abort(400)
-        buffer = io.BytesIO()
-        added = 0
-        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for rel in paths:
-                path = resolve_output_file(output_dir, rel.strip())
-                if path is None:
-                    continue
-                arc = Path(rel.strip()).as_posix()
-                zf.write(path, arcname=arc)
-                added += 1
-        if added == 0:
+        zdata = build_zip_bytes(output_dir, paths)
+        if not zdata:
             abort(404)
-        buffer.seek(0)
+        buffer = io.BytesIO(zdata)
         return send_file(
             buffer,
             mimetype="application/zip",
