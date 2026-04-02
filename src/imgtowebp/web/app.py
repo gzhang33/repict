@@ -1,10 +1,12 @@
 import argparse
+import io
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, render_template, request
+from flask import Flask, abort, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 # Handle both direct execution and package import
@@ -54,6 +56,27 @@ def safe_subdir(subdir: str) -> Path:
 
     return Path(*cleaned_parts) if cleaned_parts else Path(".")
 
+
+def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
+    """Return absolute file path if relative_path is safe and file exists under output_dir."""
+    if not relative_path or not relative_path.strip():
+        return None
+    rel = Path(relative_path.strip())
+    if rel.is_absolute():
+        return None
+    if ".." in rel.parts:
+        return None
+    full = (output_dir / rel).resolve()
+    od = output_dir.resolve()
+    try:
+        full.relative_to(od)
+    except ValueError:
+        return None
+    if not full.is_file():
+        return None
+    return full
+
+
 def create_app(output_dir: Path) -> Flask:
     # Use absolute paths for templates and static files
     web_dir = Path(__file__).parent
@@ -66,7 +89,13 @@ def create_app(output_dir: Path) -> Flask:
 
     @app.get("/")
     def index() -> str:
-        return render_template("index.html", results=None, summary=None, output_dir=str(output_dir))
+        return render_template(
+            "index.html",
+            results=None,
+            summary=None,
+            output_dir=str(output_dir),
+            zip_relpaths=[],
+        )
 
     @app.post("/upload")
     def upload() -> str:
@@ -129,7 +158,7 @@ def create_app(output_dir: Path) -> Flask:
                         original_name=original_name,
                         status="converted",
                         message="Saved.",
-                        output_relpath=str(out_path.relative_to(output_dir)),
+                        output_relpath=out_path.relative_to(output_dir).as_posix(),
                         input_bytes=res.input_size,
                         output_bytes=res.output_size,
                     )
@@ -142,7 +171,7 @@ def create_app(output_dir: Path) -> Flask:
                             original_name=original_name,
                             status="skipped",
                             message=res.message,
-                            output_relpath=str(out_path.relative_to(output_dir)),
+                            output_relpath=out_path.relative_to(output_dir).as_posix(),
                         )
                     )
                 else:
@@ -167,11 +196,59 @@ def create_app(output_dir: Path) -> Flask:
             "quality": quality,
         }
 
+        zip_relpaths = [
+            r.output_relpath
+            for r in results
+            if r.output_relpath
+            and (
+                r.status == "converted"
+                or (r.status == "skipped" and "exists" in r.message.lower())
+            )
+        ]
+
         return render_template(
             "index.html",
             results=results,
             summary=summary,
             output_dir=str(output_dir),
+            zip_relpaths=zip_relpaths,
+        )
+
+    @app.get("/download/<path:relative_path>")
+    def download_file(relative_path: str):
+        path = resolve_output_file(output_dir, relative_path)
+        if path is None:
+            abort(404)
+        return send_file(
+            path,
+            as_attachment=True,
+            download_name=path.name,
+            mimetype="image/webp",
+        )
+
+    @app.post("/download-zip")
+    def download_zip():
+        paths = request.form.getlist("paths")
+        if not paths:
+            abort(400)
+        buffer = io.BytesIO()
+        added = 0
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for rel in paths:
+                path = resolve_output_file(output_dir, rel.strip())
+                if path is None:
+                    continue
+                arc = Path(rel.strip()).as_posix()
+                zf.write(path, arcname=arc)
+                added += 1
+        if added == 0:
+            abort(404)
+        buffer.seek(0)
+        return send_file(
+            buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name="imgtowebp-images.zip",
         )
 
     return app
