@@ -1,13 +1,18 @@
 import argparse
 import base64
 import io
+import os
+import secrets
+import shutil
 import sys
+import uuid
 import zipfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, abort, render_template, request, send_file
+from flask import Flask, abort, redirect, render_template, request, send_file, session, url_for
+from PIL import Image
 from werkzeug.utils import secure_filename
 
 # Handle both direct execution and package import
@@ -82,6 +87,49 @@ def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
 # where /tmp may not exist on a different instance than /upload).
 MAX_INLINE_ZIP_BYTES = 4 * 1024 * 1024
 
+# Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
+SESSION_WORKSPACE_KEY = "imgtowebp_ws"
+SESSIONS_DIRNAME = "_sessions"
+# One-shot conversion payload for PRG: GET / consumes it; refresh hits empty session -> GET /.
+SESSION_RESULTS_ONCE_KEY = "imgtowebp_results_once"
+
+
+def _is_safe_workspace_id(workspace_id: str) -> bool:
+    if not isinstance(workspace_id, str) or len(workspace_id) != 32:
+        return False
+    return all(c in "0123456789abcdef" for c in workspace_id.lower())
+
+
+def ensure_workspace_session_id() -> str:
+    raw = session.get(SESSION_WORKSPACE_KEY)
+    if isinstance(raw, str) and _is_safe_workspace_id(raw):
+        wid = raw.lower()
+        session[SESSION_WORKSPACE_KEY] = wid
+        return wid
+    wid = uuid.uuid4().hex
+    session[SESSION_WORKSPACE_KEY] = wid
+    return wid
+
+
+def session_workspace_dir(output_dir: Path, workspace_id: str) -> Path:
+    return output_dir / SESSIONS_DIRNAME / workspace_id.lower()
+
+
+def clear_session_workspace(output_dir: Path, workspace_id: str) -> None:
+    if not _is_safe_workspace_id(workspace_id):
+        return
+    root = session_workspace_dir(output_dir, workspace_id)
+    if root.is_dir():
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def is_path_under(parent: Path, child: Path) -> bool:
+    try:
+        child.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False
+
 
 def build_zip_bytes(output_dir: Path, relpaths: list[str]) -> bytes:
     buffer = io.BytesIO()
@@ -94,7 +142,29 @@ def build_zip_bytes(output_dir: Path, relpaths: list[str]) -> bytes:
     return buffer.getvalue()
 
 
+def is_decodable_raster_image(data: bytes) -> bool:
+    """True if Pillow can decode bytes as a raster image (excludes SVG etc.)."""
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.load()
+        return True
+    except Exception:
+        return False
+
+
+def _load_repo_dotenv() -> None:
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    load_dotenv(repo_root / ".env")
+
+
 def create_app(output_dir: Path) -> Flask:
+    # Load repo-root .env (gitignored) so FLASK_SECRET_KEY can be set locally without exporting env vars.
+    _load_repo_dotenv()
+
     # Use absolute paths for templates and static files
     web_dir = Path(__file__).parent
     app = Flask(
@@ -102,15 +172,22 @@ def create_app(output_dir: Path) -> Flask:
         template_folder=str(web_dir / "templates"),
         static_folder=str(web_dir / "static"),
     )
+    app.secret_key = (
+        os.environ.get("FLASK_SECRET_KEY")
+        or os.environ.get("IMGTOWEBP_SECRET_KEY")
+        or secrets.token_hex(32)
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     @app.get("/")
     def index() -> str:
+        session.pop(SESSION_RESULTS_ONCE_KEY, None)
+        wid = ensure_workspace_session_id()
+        clear_session_workspace(output_dir, wid)
         return render_template(
             "index.html",
             results=None,
             summary=None,
-            output_dir=str(output_dir),
             zip_relpaths=[],
             inline_zip_b64=None,
             zip_fallback_only=False,
@@ -137,10 +214,14 @@ def create_app(output_dir: Path) -> Flask:
         skipped = 0
         failed = 0
 
-        target_dir = (output_dir / subdir).resolve()
-        # Security check to ensure target is within output_dir
-        if output_dir.resolve() not in target_dir.parents and target_dir != output_dir.resolve():
-            target_dir = output_dir.resolve()
+        wid = ensure_workspace_session_id()
+        clear_session_workspace(output_dir, wid)
+        ws = session_workspace_dir(output_dir, wid)
+        ws.mkdir(parents=True, exist_ok=True)
+
+        target_dir = (ws / subdir).resolve()
+        if not is_path_under(ws, target_dir):
+            target_dir = ws.resolve()
 
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -151,20 +232,26 @@ def create_app(output_dir: Path) -> Flask:
             original_name = f.filename
             safe_name = secure_filename(original_name)
             ext = Path(safe_name).suffix.lower()
-
-            if ext not in SUPPORTED_EXTENSIONS:
-                skipped += 1
-                results.append(UploadItemResult(original_name, "skipped", "Unsupported file type."))
-                continue
-
-            stem = Path(safe_name).stem
-            out_path = target_dir / f"{stem}.webp"
+            stem = Path(safe_name).stem or "image"
 
             data = f.read()
             if not data:
                 skipped += 1
                 results.append(UploadItemResult(original_name, "skipped", "Empty file."))
                 continue
+
+            if ext not in SUPPORTED_EXTENSIONS and not is_decodable_raster_image(data):
+                skipped += 1
+                results.append(
+                    UploadItemResult(
+                        original_name,
+                        "skipped",
+                        "Unsupported or unreadable image.",
+                    )
+                )
+                continue
+
+            out_path = target_dir / f"{stem}.webp"
 
             res = convert_image(data, out_path, quality=quality, overwrite=overwrite)
 
@@ -176,7 +263,7 @@ def create_app(output_dir: Path) -> Flask:
                     UploadItemResult(
                         original_name=original_name,
                         status="converted",
-                        message="Saved.",
+                        message="Ready to download.",
                         output_relpath=out_path.relative_to(output_dir).as_posix(),
                         input_bytes=res.input_size,
                         output_bytes=res.output_size,
@@ -225,9 +312,32 @@ def create_app(output_dir: Path) -> Flask:
             )
         ]
 
-        inline_zip_b64: str | None = None
-        zip_fallback_only = False
+        zip_fallback_only_flag = False
         if zip_relpaths:
+            zdata = build_zip_bytes(output_dir, zip_relpaths)
+            if len(zdata) > MAX_INLINE_ZIP_BYTES:
+                zip_fallback_only_flag = True
+
+        session[SESSION_RESULTS_ONCE_KEY] = {
+            "results": [asdict(r) for r in results],
+            "summary": summary,
+            "zip_relpaths": zip_relpaths,
+            "zip_fallback_only": zip_fallback_only_flag,
+        }
+        return redirect(url_for("results"), code=303)
+
+    @app.get("/results")
+    def results() -> Any:
+        raw = session.pop(SESSION_RESULTS_ONCE_KEY, None)
+        if not raw:
+            return redirect(url_for("index"), code=302)
+        results_list = [UploadItemResult(**item) for item in raw["results"]]
+        summary = raw["summary"]
+        zip_relpaths = raw["zip_relpaths"]
+        zip_fallback_only = bool(raw["zip_fallback_only"])
+
+        inline_zip_b64: str | None = None
+        if zip_relpaths and not zip_fallback_only:
             zdata = build_zip_bytes(output_dir, zip_relpaths)
             if len(zdata) <= MAX_INLINE_ZIP_BYTES:
                 inline_zip_b64 = base64.b64encode(zdata).decode("ascii")
@@ -236,12 +346,31 @@ def create_app(output_dir: Path) -> Flask:
 
         return render_template(
             "index.html",
-            results=results,
+            results=results_list,
             summary=summary,
-            output_dir=str(output_dir),
             zip_relpaths=zip_relpaths,
             inline_zip_b64=inline_zip_b64,
             zip_fallback_only=zip_fallback_only,
+        )
+
+    @app.post("/session/discard")
+    def discard_session_workspace() -> tuple[str, int]:
+        raw = session.get(SESSION_WORKSPACE_KEY)
+        if isinstance(raw, str) and _is_safe_workspace_id(raw):
+            clear_session_workspace(output_dir, raw)
+        return ("", 204)
+
+    @app.get("/preview/<path:relative_path>")
+    def preview_file(relative_path: str):
+        """Inline WebP for list thumbnails (not Content-Disposition: attachment)."""
+        path = resolve_output_file(output_dir, relative_path)
+        if path is None:
+            abort(404)
+        return send_file(
+            path,
+            as_attachment=False,
+            mimetype="image/webp",
+            max_age=300,
         )
 
     @app.get("/download/<path:relative_path>")
