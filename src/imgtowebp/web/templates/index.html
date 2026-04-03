@@ -97,160 +97,41 @@
       id="mainForm"
       class="min-h-screen flex flex-col"
     >
-      <!-- Navbar -->
+      <!-- Navbar: hidden form fields only (no visible chrome) -->
       <header
-        class="fixed top-0 left-0 right-0 z-40 p-6 flex justify-between items-center pointer-events-none"
+        class="fixed top-0 left-0 right-0 z-40 p-6 flex justify-end items-center pointer-events-none"
       >
-        <div class="pointer-events-auto flex items-center">
-          <span
-            class="font-bold text-slate-800 tracking-tight text-lg sm:text-xl leading-none"
-            >ImgToWebp</span
-          >
-        </div>
-
-        <div class="pointer-events-auto relative">
-          <button
-            type="button"
-            id="settingsToggle"
-            class="w-10 h-10 bg-white rounded-full shadow-sm border border-slate-200 flex items-center justify-center text-slate-500 hover:text-brand-600 hover:border-brand-200 transition-all hover:rotate-90 duration-300 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          >
-            <!-- Gear Icon -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
-              />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
-
-          <!-- Settings Popover -->
-          <div
-            id="settingsPanel"
-            class="hidden absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 p-6 transform origin-top-right transition-all duration-200 scale-95 opacity-0 z-50"
-          >
-            <h3
-              class="font-semibold text-slate-800 mb-4 flex items-center gap-2"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-brand-500"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path
-                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                />
-              </svg>
-              Global Settings
-            </h3>
-
-            <div class="space-y-5">
-              <!-- Quality -->
-              <div>
-                <div class="flex justify-between mb-2">
-                  <label
-                    for="quality"
-                    class="text-xs font-medium text-slate-500 uppercase tracking-wider"
-                    >Quality</label
-                  >
-                  <span
-                    class="text-xs font-mono font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded"
-                    id="qualityValue"
-                    >80%</span
-                  >
-                </div>
-                <input
-                  type="range"
-                  id="quality"
-                  name="quality"
-                  min="0"
-                  max="100"
-                  value="80"
-                  class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-                />
-              </div>
-
-              <!-- Output Dir -->
-              <div>
-                <label
-                  for="subdir"
-                  class="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-2"
-                  >Output Subfolder</label
-                >
-                <div class="relative">
-                  <span
-                    class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path
-                        d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-                      />
-                    </svg>
-                  </span>
-                  <input
-                    type="text"
-                    id="subdir"
-                    name="subdir"
-                    placeholder="e.g. deck1"
-                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <!-- Overwrite -->
-              <div class="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="overwrite"
-                  name="overwrite"
-                  class="w-5 h-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
-                />
-                <label
-                  for="overwrite"
-                  class="text-sm text-slate-600 cursor-pointer select-none"
-                  >Overwrite existing files</label
-                >
-              </div>
-            </div>
-          </div>
+        <div class="pointer-events-auto">
+          <input type="hidden" name="quality" value="100" />
         </div>
       </header>
 
       <!-- Main Content -->
       <main
-        class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-7xl mx-auto relative z-10"
+        class="flex-1 flex flex-col items-center justify-center px-6 pt-24 pb-10 w-full max-w-7xl mx-auto relative z-10"
       >
         <div
-          class="w-full max-w-4xl transition-all duration-500"
+          class="w-full max-w-4xl flex flex-col gap-6 sm:gap-8 animate-fade-in"
           id="dropContainer"
         >
+            <div class="text-center">
+            <div class="relative inline-flex flex-col items-center mb-2">
+              <div
+                aria-hidden="true"
+                class="absolute -inset-4 bg-gradient-to-r from-brand-600/15 to-slate-900/0 blur-2xl rounded-full"
+              ></div>
+              <h1
+                class="relative font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-slate-800 via-brand-600 to-slate-800 text-[clamp(1.875rem,3.5vw,3.125rem)] leading-[1.4] pb-2"
+              >
+                ImgToWebp
+              </h1>
+              <div
+                aria-hidden="true"
+                class="relative mt-3 h-px w-32 bg-gradient-to-r from-brand-600/0 via-brand-600/70 to-brand-600/0"
+              ></div>
+            </div>
+          </div>
+
           <!-- Drop Zone -->
           <div
             id="dropZone"
@@ -936,50 +817,6 @@
           span.className = "js-detail-msg text-emerald-700 font-medium";
         });
       })();
-
-      // Settings Toggle
-      const settingsToggle = document.getElementById("settingsToggle");
-      const settingsPanel = document.getElementById("settingsPanel");
-      const qualityInput = document.getElementById("quality");
-      const qualityValue = document.getElementById("qualityValue");
-
-      if (settingsToggle && settingsPanel) {
-        settingsToggle.addEventListener("click", () => {
-          const isHidden = settingsPanel.classList.contains("hidden");
-          if (isHidden) {
-            settingsPanel.classList.remove("hidden");
-            // Small timeout to allow removing hidden before adding opacity transition
-            requestAnimationFrame(() => {
-              settingsPanel.classList.remove("scale-95", "opacity-0");
-              settingsPanel.classList.add("scale-100", "opacity-100");
-            });
-          } else {
-            settingsPanel.classList.remove("scale-100", "opacity-100");
-            settingsPanel.classList.add("scale-95", "opacity-0");
-            setTimeout(() => settingsPanel.classList.add("hidden"), 200);
-          }
-        });
-
-        // Close when clicking outside
-        document.addEventListener("click", (e) => {
-          if (
-            !settingsToggle.contains(e.target) &&
-            !settingsPanel.contains(e.target)
-          ) {
-            if (!settingsPanel.classList.contains("hidden")) {
-              settingsPanel.classList.remove("scale-100", "opacity-100");
-              settingsPanel.classList.add("scale-95", "opacity-0");
-              setTimeout(() => settingsPanel.classList.add("hidden"), 200);
-            }
-          }
-        });
-      }
-
-      if (qualityInput) {
-        qualityInput.addEventListener("input", (e) => {
-          qualityValue.textContent = e.target.value + "%";
-        });
-      }
 
       // --- Dropzone Logic (Only if on dropzone page) ---
       const dropZone = document.getElementById("dropZone");

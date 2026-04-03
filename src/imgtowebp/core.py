@@ -4,7 +4,7 @@ from pathlib import Path
 from PIL import Image
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-DEFAULT_QUALITY = 80
+DEFAULT_QUALITY = 100
 
 @dataclass
 class ConversionResult:
