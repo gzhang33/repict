@@ -222,7 +222,7 @@ def create_app(output_dir: Path) -> Flask:
     }
 
     @app.errorhandler(RequestEntityTooLarge)
-    def handle_request_too_large(_: RequestEntityTooLarge):
+    def handle_request_too_large(error: RequestEntityTooLarge):
         session[SESSION_FORM_ERROR_ONCE_KEY] = (
             "Upload is too large. Keep total upload size under 4 MB."
         )
@@ -260,7 +260,6 @@ def create_app(output_dir: Path) -> Flask:
         quality = max(0, min(100, quality))
 
         results: list[UploadItemResult] = []
-        validated_uploads: list[tuple[str, str, bytes]] = []
         total_in = 0
         total_out = 0
         total_received = 0
@@ -313,9 +312,6 @@ def create_app(output_dir: Path) -> Flask:
                 )
                 continue
 
-            validated_uploads.append((original_name, stem, data))
-
-        for original_name, stem, data in validated_uploads:
             out_path = target_dir / f"{stem}.webp"
 
             res = convert_image(data, out_path, quality=quality, overwrite=overwrite)
