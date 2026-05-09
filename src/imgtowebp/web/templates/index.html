@@ -206,6 +206,27 @@
               >
             </div>
           </div>
+
+          <div class="w-full max-w-3xl mx-auto space-y-2">
+            <p class="text-xs text-slate-500 text-center">
+              Upload policy: JPG/JPEG/PNG only, up to 4 MB total.
+            </p>
+            {% if form_error %}
+            <div
+              id="formErrorBanner"
+              class="rounded-xl border border-red-200 bg-red-50 text-red-800 px-4 py-3 text-sm text-center"
+              role="alert"
+            >
+              {{ form_error }}
+            </div>
+            {% else %}
+            <div
+              id="formErrorBanner"
+              class="hidden rounded-xl border border-red-200 bg-red-50 text-red-800 px-4 py-3 text-sm text-center"
+              role="alert"
+            ></div>
+            {% endif %}
+          </div>
         </div>
 
         <!-- Floating Action Bar -->
@@ -788,10 +809,99 @@
 
       // --- Shared Logic ---
 
+      const uploadPolicy = {{ upload_policy | tojson }};
       const mainForm = document.getElementById("mainForm");
       const convertingOverlay = document.getElementById("convertingOverlay");
+      const formErrorBanner = document.getElementById("formErrorBanner");
+      let selectedFiles = [];
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      }
+
+      function setFormError(message) {
+        if (!formErrorBanner) return;
+        if (!message) {
+          formErrorBanner.classList.add("hidden");
+          formErrorBanner.textContent = "";
+          return;
+        }
+        formErrorBanner.textContent = message;
+        formErrorBanner.classList.remove("hidden");
+      }
+
+      function normalizeMime(mime) {
+        return String(mime || "").split(";")[0].trim().toLowerCase();
+      }
+
+      function getFileExt(name) {
+        const parts = String(name || "").toLowerCase().split(".");
+        if (parts.length < 2) return "";
+        return `.${parts.pop()}`;
+      }
+
+      function validateSelectedFiles(fileList) {
+        const validFiles = [];
+        const errors = [];
+        const allowedMimes = new Set(uploadPolicy.allowed_mime_types || []);
+        const allowedExts = new Set(uploadPolicy.allowed_extensions || []);
+        const maxFileBytes = Number(uploadPolicy.max_file_bytes || 0);
+        const maxTotalBytes = Number(uploadPolicy.max_total_bytes || 0);
+        let totalBytes = 0;
+
+        Array.from(fileList || []).forEach((file) => {
+          const ext = getFileExt(file.name);
+          const mime = normalizeMime(file.type);
+          if (!allowedExts.has(ext)) {
+            errors.push(`${file.name}: unsupported type.`);
+            return;
+          }
+          if (mime && !allowedMimes.has(mime)) {
+            errors.push(`${file.name}: unsupported type.`);
+            return;
+          }
+          if (maxFileBytes > 0 && file.size > maxFileBytes) {
+            errors.push(
+              `${file.name}: too large (${formatBytes(file.size)} > ${formatBytes(
+                maxFileBytes
+              )}).`
+            );
+            return;
+          }
+          totalBytes += file.size;
+          if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
+            errors.push(
+              `Total size is too large (${formatBytes(totalBytes)} > ${formatBytes(
+                maxTotalBytes
+              )}).`
+            );
+            return;
+          }
+          validFiles.push(file);
+        });
+
+        return { validFiles, errors, totalBytes };
+      }
+
       if (mainForm && convertingOverlay) {
-        mainForm.addEventListener("submit", function () {
+        mainForm.addEventListener("submit", function (e) {
+          const maxTotalBytes = Number(uploadPolicy.max_total_bytes || 0);
+          const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+          if (!selectedFiles.length) {
+            e.preventDefault();
+            setFormError("Please select at least one JPG or PNG image.");
+            return;
+          }
+          if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
+            e.preventDefault();
+            setFormError(
+              `Total size is too large. Keep upload under ${formatBytes(maxTotalBytes)}.`
+            );
+            return;
+          }
+          setFormError("");
           convertingOverlay.classList.remove("hidden");
           const cbtn = document.getElementById("convertBtn");
           if (cbtn) {
@@ -825,6 +935,23 @@
       const previewGrid = document.getElementById("previewGrid");
       const actionBar = document.getElementById("actionBar");
       const fileCountBadge = document.getElementById("fileCountBadge");
+      function resetSelectionState() {
+        selectedFiles = [];
+        if (fileInput) {
+          const dt = new DataTransfer();
+          fileInput.files = dt.files;
+        }
+        if (emptyState) emptyState.classList.remove("hidden");
+        if (previewGrid) {
+          previewGrid.classList.add("hidden");
+          previewGrid.classList.remove("grid");
+          previewGrid.innerHTML = "";
+        }
+        if (actionBar) {
+          actionBar.classList.add("translate-y-24", "opacity-0", "scale-95");
+        }
+        if (fileCountBadge) fileCountBadge.textContent = "0";
+      }
 
       if (dropZone && fileInput) {
         // Click to upload
@@ -871,19 +998,36 @@
             e.stopPropagation();
             dropZone.classList.remove("border-brand-500", "bg-brand-50/20");
 
-            const files = e.dataTransfer.files;
-            if (files.length) {
-              fileInput.files = files; // Update input
-              handleFiles(files);
-            }
-          },
-          false
-        );
+             const files = e.dataTransfer.files;
+             if (files.length) {
+               applyFiles(files);
+             }
+           },
+           false
+         );
 
         // File Input Change
         fileInput.addEventListener("change", (e) => {
-          handleFiles(e.target.files);
+          applyFiles(e.target.files);
         });
+
+        function applyFiles(files) {
+          const { validFiles, errors } = validateSelectedFiles(files);
+          if (errors.length) {
+            setFormError(errors.slice(0, 3).join(" "));
+          } else {
+            setFormError("");
+          }
+          if (!validFiles.length) {
+            resetSelectionState();
+            return;
+          }
+          selectedFiles = validFiles;
+          const dt = new DataTransfer();
+          validFiles.forEach((file) => dt.items.add(file));
+          fileInput.files = dt.files;
+          handleFiles(validFiles);
+        }
 
         function handleFiles(files) {
           if (!files || files.length === 0) return;

@@ -13,6 +13,7 @@ from typing import Any
 
 from flask import Flask, abort, redirect, render_template, request, send_file, session, url_for
 from PIL import Image
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 
 # Handle both direct execution and package import
@@ -86,12 +87,19 @@ def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
 # Inline ZIP in the upload HTML avoids a second HTTP request (needed on serverless
 # where /tmp may not exist on a different instance than /upload).
 MAX_INLINE_ZIP_BYTES = 4 * 1024 * 1024
+VERCEL_FUNCTION_PAYLOAD_LIMIT_BYTES = int(4.5 * 1024 * 1024)
+# Keep a safety margin under Vercel's 4.5MB request payload limit.
+UPLOAD_TOTAL_LIMIT_BYTES = 4 * 1024 * 1024
+UPLOAD_FILE_LIMIT_BYTES = 4 * 1024 * 1024
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
 
 # Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
 SESSION_WORKSPACE_KEY = "imgtowebp_ws"
 SESSIONS_DIRNAME = "_sessions"
 # One-shot conversion payload for PRG: GET / consumes it; refresh hits empty session -> GET /.
 SESSION_RESULTS_ONCE_KEY = "imgtowebp_results_once"
+SESSION_FORM_ERROR_ONCE_KEY = "imgtowebp_form_error_once"
 
 
 def _is_safe_workspace_id(workspace_id: str) -> bool:
@@ -152,6 +160,31 @@ def is_decodable_raster_image(data: bytes) -> bool:
         return False
 
 
+def normalize_mimetype(raw: str | None) -> str:
+    return (raw or "").split(";", 1)[0].strip().lower()
+
+
+def validate_upload_payload(
+    *,
+    filename: str,
+    ext: str,
+    data: bytes,
+    mimetype: str | None,
+) -> str | None:
+    if not data:
+        return "Empty file."
+    if len(data) > UPLOAD_FILE_LIMIT_BYTES:
+        return "Single file is too large. Keep each file under 4 MB."
+    if ext not in ALLOWED_EXTENSIONS:
+        return "Unsupported file type. Only JPG/JPEG/PNG are allowed."
+    normalized_mime = normalize_mimetype(mimetype)
+    if normalized_mime and normalized_mime not in ALLOWED_MIME_TYPES:
+        return "Unsupported file type. Please upload a JPG or PNG image."
+    if not is_decodable_raster_image(data):
+        return "Unsupported or unreadable image."
+    return None
+
+
 def _load_repo_dotenv() -> None:
     try:
         from dotenv import load_dotenv
@@ -172,6 +205,7 @@ def create_app(output_dir: Path) -> Flask:
         template_folder=str(web_dir / "templates"),
         static_folder=str(web_dir / "static"),
     )
+    app.config["MAX_CONTENT_LENGTH"] = UPLOAD_TOTAL_LIMIT_BYTES
     app.secret_key = (
         os.environ.get("FLASK_SECRET_KEY")
         or os.environ.get("IMGTOWEBP_SECRET_KEY")
@@ -179,11 +213,27 @@ def create_app(output_dir: Path) -> Flask:
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    upload_policy: dict[str, Any] = {
+        "vercel_function_limit_bytes": VERCEL_FUNCTION_PAYLOAD_LIMIT_BYTES,
+        "max_total_bytes": UPLOAD_TOTAL_LIMIT_BYTES,
+        "max_file_bytes": UPLOAD_FILE_LIMIT_BYTES,
+        "allowed_mime_types": sorted(ALLOWED_MIME_TYPES),
+        "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+    }
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_too_large(_: RequestEntityTooLarge):
+        session[SESSION_FORM_ERROR_ONCE_KEY] = (
+            "Upload is too large. Keep total upload size under 4 MB."
+        )
+        return redirect(url_for("index"), code=303)
+
     @app.get("/")
     def index() -> str:
         session.pop(SESSION_RESULTS_ONCE_KEY, None)
         wid = ensure_workspace_session_id()
         clear_session_workspace(output_dir, wid)
+        form_error = session.pop(SESSION_FORM_ERROR_ONCE_KEY, None)
         return render_template(
             "index.html",
             results=None,
@@ -191,6 +241,8 @@ def create_app(output_dir: Path) -> Flask:
             zip_relpaths=[],
             inline_zip_b64=None,
             zip_fallback_only=False,
+            form_error=form_error,
+            upload_policy=upload_policy,
         )
 
     @app.post("/upload")
@@ -208,8 +260,10 @@ def create_app(output_dir: Path) -> Flask:
         quality = max(0, min(100, quality))
 
         results: list[UploadItemResult] = []
+        validated_uploads: list[tuple[str, str, bytes]] = []
         total_in = 0
         total_out = 0
+        total_received = 0
         converted = 0
         skipped = 0
         failed = 0
@@ -235,22 +289,33 @@ def create_app(output_dir: Path) -> Flask:
             stem = Path(safe_name).stem or "image"
 
             data = f.read()
-            if not data:
-                skipped += 1
-                results.append(UploadItemResult(original_name, "skipped", "Empty file."))
-                continue
+            total_received += len(data)
+            if total_received > UPLOAD_TOTAL_LIMIT_BYTES:
+                session[SESSION_FORM_ERROR_ONCE_KEY] = (
+                    "Upload is too large. Keep total upload size under 4 MB."
+                )
+                return redirect(url_for("index"), code=303)
 
-            if ext not in SUPPORTED_EXTENSIONS and not is_decodable_raster_image(data):
+            validation_error = validate_upload_payload(
+                filename=original_name,
+                ext=ext,
+                data=data,
+                mimetype=f.mimetype,
+            )
+            if validation_error:
                 skipped += 1
                 results.append(
                     UploadItemResult(
                         original_name,
                         "skipped",
-                        "Unsupported or unreadable image.",
+                        validation_error,
                     )
                 )
                 continue
 
+            validated_uploads.append((original_name, stem, data))
+
+        for original_name, stem, data in validated_uploads:
             out_path = target_dir / f"{stem}.webp"
 
             res = convert_image(data, out_path, quality=quality, overwrite=overwrite)
@@ -351,6 +416,8 @@ def create_app(output_dir: Path) -> Flask:
             zip_relpaths=zip_relpaths,
             inline_zip_b64=inline_zip_b64,
             zip_fallback_only=zip_fallback_only,
+            form_error=None,
+            upload_policy=upload_policy,
         )
 
     @app.post("/session/discard")
