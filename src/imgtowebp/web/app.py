@@ -87,11 +87,10 @@ def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
 # Inline ZIP in the upload HTML avoids a second HTTP request (needed on serverless
 # where /tmp may not exist on a different instance than /upload).
 MAX_INLINE_ZIP_BYTES = 4 * 1024 * 1024
-VERCEL_FUNCTION_PAYLOAD_LIMIT_BYTES = int(4.5 * 1024 * 1024)
 # Keep a safety margin under Vercel's 4.5MB request payload limit.
 UPLOAD_TOTAL_LIMIT_BYTES = 4 * 1024 * 1024
 UPLOAD_FILE_LIMIT_BYTES = 4 * 1024 * 1024
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
 ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
 
 # Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
@@ -164,6 +163,10 @@ def normalize_mimetype(raw: str | None) -> str:
     return (raw or "").split(";", 1)[0].strip().lower()
 
 
+def limit_label(num_bytes: int) -> str:
+    return f"{num_bytes / (1024 * 1024):.0f} MB"
+
+
 def validate_upload_payload(
     *,
     filename: str,
@@ -174,7 +177,7 @@ def validate_upload_payload(
     if not data:
         return "Empty file."
     if len(data) > UPLOAD_FILE_LIMIT_BYTES:
-        return "Single file is too large. Keep each file under 4 MB."
+        return f"Single file is too large. Keep each file under {limit_label(UPLOAD_FILE_LIMIT_BYTES)}."
     if ext not in ALLOWED_EXTENSIONS:
         return "Unsupported file type. Only JPG/JPEG/PNG are allowed."
     normalized_mime = normalize_mimetype(mimetype)
@@ -214,7 +217,6 @@ def create_app(output_dir: Path) -> Flask:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     upload_policy: dict[str, Any] = {
-        "vercel_function_limit_bytes": VERCEL_FUNCTION_PAYLOAD_LIMIT_BYTES,
         "max_total_bytes": UPLOAD_TOTAL_LIMIT_BYTES,
         "max_file_bytes": UPLOAD_FILE_LIMIT_BYTES,
         "allowed_mime_types": sorted(ALLOWED_MIME_TYPES),
@@ -222,9 +224,9 @@ def create_app(output_dir: Path) -> Flask:
     }
 
     @app.errorhandler(RequestEntityTooLarge)
-    def handle_request_too_large(error: RequestEntityTooLarge):
+    def handle_request_too_large(_error: RequestEntityTooLarge):
         session[SESSION_FORM_ERROR_ONCE_KEY] = (
-            "Upload is too large. Keep total upload size under 4 MB."
+            f"Upload is too large. Keep total upload size under {limit_label(UPLOAD_TOTAL_LIMIT_BYTES)}."
         )
         return redirect(url_for("index"), code=303)
 
@@ -291,7 +293,7 @@ def create_app(output_dir: Path) -> Flask:
             total_received += len(data)
             if total_received > UPLOAD_TOTAL_LIMIT_BYTES:
                 session[SESSION_FORM_ERROR_ONCE_KEY] = (
-                    "Upload is too large. Keep total upload size under 4 MB."
+                    f"Upload is too large. Keep total upload size under {limit_label(UPLOAD_TOTAL_LIMIT_BYTES)}."
                 )
                 return redirect(url_for("index"), code=303)
 

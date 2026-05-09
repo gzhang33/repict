@@ -209,7 +209,7 @@
 
           <div class="w-full max-w-3xl mx-auto space-y-2">
             <p class="text-xs text-slate-500 text-center">
-              Upload policy: JPG/JPEG/PNG only, up to 4 MB total.
+              Upload policy: JPG/JPEG/PNG only, up to {{ (upload_policy.max_total_bytes / (1024 * 1024)) | int }} MB total.
             </p>
             {% if form_error %}
             <div
@@ -895,7 +895,7 @@
       function setInputFiles(fileInputEl, files) {
         if (!fileInputEl) return false;
         try {
-          if (typeof DataTransfer === "undefined") {
+          if (typeof DataTransfer !== "function") {
             return false;
           }
           const dt = new DataTransfer();
@@ -1045,7 +1045,7 @@
           selectedFiles = validFiles;
           if (!setInputFiles(fileInput, validFiles)) {
             setFormError(
-              "Your browser does not support programmatic file selection. Please use the file picker to select your files again."
+              "Your browser does not support programmatic file selection. Please re-select files using the Select Files button."
             );
             resetSelectionState();
             return;
