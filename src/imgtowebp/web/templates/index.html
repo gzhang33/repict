@@ -852,16 +852,16 @@
         const maxTotalBytes = Number(uploadPolicy.max_total_bytes || 0);
         let totalBytes = 0;
 
-        Array.from(fileList || []).forEach((file) => {
+        for (const file of Array.from(fileList || [])) {
           const ext = getFileExt(file.name);
           const mime = normalizeMime(file.type);
           if (!ALLOWED_EXTENSIONS.has(ext)) {
             errors.push(`${file.name}: unsupported type.`);
-            return;
+            continue;
           }
           if (mime && !ALLOWED_MIME_TYPES.has(mime)) {
             errors.push(`${file.name}: unsupported type.`);
-            return;
+            continue;
           }
           if (maxFileBytes > 0 && file.size > maxFileBytes) {
             errors.push(
@@ -869,7 +869,7 @@
                 maxFileBytes
               )}).`
             );
-            return;
+            continue;
           }
           totalBytes += file.size;
           if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
@@ -878,10 +878,10 @@
                 maxTotalBytes
               )}).`
             );
-            return;
+            break;
           }
           validFiles.push(file);
-        });
+        }
 
         return { validFiles, errors, totalBytes };
       }
