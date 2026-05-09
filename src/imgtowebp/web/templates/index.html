@@ -810,6 +810,7 @@
       // --- Shared Logic ---
 
       const uploadPolicy = {{ upload_policy | tojson }};
+      const MAX_DISPLAYED_ERRORS = 3;
       const mainForm = document.getElementById("mainForm");
       const convertingOverlay = document.getElementById("convertingOverlay");
       const formErrorBanner = document.getElementById("formErrorBanner");
@@ -885,6 +886,22 @@
         return { validFiles, errors, totalBytes };
       }
 
+      function setInputFiles(fileInputEl, files) {
+        if (!fileInputEl) return false;
+        try {
+          if (typeof DataTransfer === "undefined") {
+            return false;
+          }
+          const dt = new DataTransfer();
+          (files || []).forEach((file) => dt.items.add(file));
+          fileInputEl.files = dt.files;
+          return true;
+        } catch (e) {
+          console.error(e);
+          return false;
+        }
+      }
+
       if (mainForm && convertingOverlay) {
         mainForm.addEventListener("submit", function (e) {
           const maxTotalBytes = Number(uploadPolicy.max_total_bytes || 0);
@@ -937,10 +954,7 @@
       const fileCountBadge = document.getElementById("fileCountBadge");
       function resetSelectionState() {
         selectedFiles = [];
-        if (fileInput) {
-          const dt = new DataTransfer();
-          fileInput.files = dt.files;
-        }
+        if (fileInput) setInputFiles(fileInput, []);
         if (emptyState) emptyState.classList.remove("hidden");
         if (previewGrid) {
           previewGrid.classList.add("hidden");
@@ -1014,7 +1028,7 @@
         function applyFiles(files) {
           const { validFiles, errors } = validateSelectedFiles(files);
           if (errors.length) {
-            setFormError(errors.slice(0, 3).join(" "));
+            setFormError(errors.slice(0, MAX_DISPLAYED_ERRORS).join(" "));
           } else {
             setFormError("");
           }
@@ -1023,9 +1037,13 @@
             return;
           }
           selectedFiles = validFiles;
-          const dt = new DataTransfer();
-          validFiles.forEach((file) => dt.items.add(file));
-          fileInput.files = dt.files;
+          if (!setInputFiles(fileInput, validFiles)) {
+            setFormError(
+              "Browser does not support this upload workflow. Please use the file picker again."
+            );
+            resetSelectionState();
+            return;
+          }
           handleFiles(validFiles);
         }
 
