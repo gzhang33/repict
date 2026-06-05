@@ -202,6 +202,17 @@ def _load_repo_dotenv() -> None:
     load_dotenv(repo_root / ".env")
 
 
+def _mime_for_ext(ext: str) -> str:
+    ext = ext.lower()
+    if ext in (".heic", ".heif"):
+        return "image/heic"
+    if ext in (".jpg", ".jpeg"):
+        return "image/jpeg"
+    if ext == ".png":
+        return "image/png"
+    return "image/webp"
+
+
 def create_app(output_dir: Path) -> Flask:
     # Load repo-root .env (gitignored) so FLASK_SECRET_KEY can be set locally without exporting env vars.
     _load_repo_dotenv()
@@ -260,7 +271,9 @@ def create_app(output_dir: Path) -> Flask:
         overwrite = True
         subdir = safe_subdir(request.form.get("subdir", ""))
         output_format = request.form.get("format", "webp").lower()
-        if output_format not in ["webp", "heic"]:
+        if output_format == "jpg":
+            output_format = "jpeg"
+        if output_format not in ["webp", "heic", "jpeg", "png"]:
             output_format = "webp"
 
         results: list[UploadItemResult] = []
@@ -434,12 +447,10 @@ def create_app(output_dir: Path) -> Flask:
         path = resolve_output_file(output_dir, relative_path)
         if path is None:
             abort(404)
-        ext = path.suffix.lower()
-        mimetype = "image/heic" if ext in (".heic", ".heif") else "image/webp"
         return send_file(
             path,
             as_attachment=False,
-            mimetype=mimetype,
+            mimetype=_mime_for_ext(path.suffix),
             max_age=300,
         )
 
@@ -448,13 +459,11 @@ def create_app(output_dir: Path) -> Flask:
         path = resolve_output_file(output_dir, relative_path)
         if path is None:
             abort(404)
-        ext = path.suffix.lower()
-        mimetype = "image/heic" if ext in (".heic", ".heif") else "image/webp"
         return send_file(
             path,
             as_attachment=True,
             download_name=path.name,
-            mimetype=mimetype,
+            mimetype=_mime_for_ext(path.suffix),
         )
 
     @app.post("/download-zip")
