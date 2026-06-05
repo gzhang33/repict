@@ -8,7 +8,7 @@ try:
     import pillow_heif
     pillow_heif.register_heif_opener()
     HEIC_SUPPORTED = True
-except ImportError:
+except Exception:
     HEIC_SUPPORTED = False
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
