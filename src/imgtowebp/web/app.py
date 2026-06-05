@@ -256,19 +256,12 @@ def create_app(output_dir: Path) -> Flask:
     @app.post("/upload")
     def upload() -> str:
         files = request.files.getlist("files")
-        quality_raw = request.form.get("quality", str(DEFAULT_QUALITY))
-        overwrite = request.form.get("overwrite") == "on"
+        quality = DEFAULT_QUALITY
+        overwrite = True
         subdir = safe_subdir(request.form.get("subdir", ""))
         output_format = request.form.get("format", "webp").lower()
         if output_format not in ["webp", "heic"]:
             output_format = "webp"
-
-        try:
-            quality = int(quality_raw)
-        except ValueError:
-            quality = DEFAULT_QUALITY
-
-        quality = max(0, min(100, quality))
 
         results: list[UploadItemResult] = []
         total_in = 0
