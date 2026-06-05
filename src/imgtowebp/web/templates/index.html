@@ -226,6 +226,7 @@
                 {% endif %}
                 {% endfor %}
               </div>
+              <p class="mt-4 text-slate-400 text-xs">Max {{ (upload_policy.max_total_bytes / (1024 * 1024)) | int }} MB per upload</p>
             </div>
 
             <!-- Selected Files Grid (Injected by JS) -->
@@ -249,9 +250,6 @@
           </div>
 
           <div class="w-full max-w-3xl mx-auto space-y-2">
-            <p class="text-xs text-slate-500 text-center">
-              Upload policy: {{ upload_policy.allowed_formats_label }} only, up to {{ (upload_policy.max_total_bytes / (1024 * 1024)) | int }} MB total.
-            </p>
             {% if form_error %}
             <div
               id="formErrorBanner"
