@@ -10,7 +10,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from imgtowebp.web.app import create_app, validate_upload_payload  # noqa: E402
+from imgtowebp.web.app import create_app, validate_upload_payload, ALLOWED_FORMATS_DISPLAY  # noqa: E402
 from imgtowebp.core import HEIC_SUPPORTED
 
 
@@ -22,7 +22,7 @@ class UploadValidationTests(unittest.TestCase):
             data=b"not-an-image",
             mimetype="application/pdf",
         )
-        self.assertEqual(message, "Unsupported file type. Only JPG/JPEG/PNG/WEBP are allowed.")
+        self.assertEqual(message, f"Unsupported file type. Only {ALLOWED_FORMATS_DISPLAY} are allowed.")
 
     def test_validate_upload_payload_rejects_large_file(self):
         data = b"a" * (4 * 1024 * 1024 + 1)

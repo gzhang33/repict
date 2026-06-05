@@ -24,7 +24,7 @@ class ConversionResult:
     output_size: int = 0
     saved_bytes: int = 0
 
-def ensure_webp_compatible_mode(img: Image.Image) -> Image.Image:
+def ensure_compatible_mode(img: Image.Image) -> Image.Image:
     """Ensure the image is in a mode compatible with WebP/HEIC (RGB or RGBA)."""
     if img.mode in ("RGB", "RGBA"):
         return img
@@ -72,7 +72,7 @@ def convert_image(
                 return ConversionResult(False, "HEIC/HEIF conversion is not supported. Please install pillow-heif.")
 
         with img:
-            converted_img = ensure_webp_compatible_mode(img)
+            converted_img = ensure_compatible_mode(img)
             try:
                 if fmt == "heic" or fmt == "heif":
                     converted_img.save(output_path, "HEIF", quality=quality)

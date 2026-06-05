@@ -96,6 +96,7 @@ ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 if HEIC_SUPPORTED:
     ALLOWED_MIME_TYPES.update({"image/heic", "image/heif"})
 ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
+ALLOWED_FORMATS_DISPLAY = "/".join(ext.replace(".", "").upper() for ext in sorted(ALLOWED_EXTENSIONS) if ext)
 
 # Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
 SESSION_WORKSPACE_KEY = "imgtowebp_ws"
@@ -183,10 +184,10 @@ def validate_upload_payload(
     if len(data) > UPLOAD_FILE_LIMIT_BYTES:
         return f"Single file is too large. Keep each file under {limit_label(UPLOAD_FILE_LIMIT_BYTES)}."
     if ext not in ALLOWED_EXTENSIONS:
-        return "Unsupported file type. Only JPG/JPEG/PNG/WEBP are allowed."
+        return f"Unsupported file type. Only {ALLOWED_FORMATS_DISPLAY} are allowed."
     normalized_mime = normalize_mimetype(mimetype)
     if normalized_mime and normalized_mime not in ALLOWED_MIME_TYPES:
-        return "Unsupported file type. Please upload a JPG, PNG, or WEBP image."
+        return f"Unsupported file type. Please upload a {ALLOWED_FORMATS_DISPLAY} image."
     if not is_decodable_raster_image(data):
         return "Unsupported or unreadable image."
     return None
