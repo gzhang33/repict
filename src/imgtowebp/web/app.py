@@ -9,7 +9,7 @@ import uuid
 import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 from flask import Flask, abort, redirect, render_template, request, send_file, session, url_for
 from PIL import Image
@@ -23,6 +23,7 @@ try:
         DEFAULT_QUALITY,
         convert_image,
         format_bytes,
+        HEIC_SUPPORTED,
     )
 except ImportError:
     # If relative import fails, add src directory to path
@@ -35,6 +36,7 @@ except ImportError:
         DEFAULT_QUALITY,
         convert_image,
         format_bytes,
+        HEIC_SUPPORTED,
     )
 
 @dataclass
@@ -42,7 +44,7 @@ class UploadItemResult:
     original_name: str
     status: str
     message: str
-    output_relpath: str | None = None
+    output_relpath: Optional[str] = None
     input_bytes: int = 0
     output_bytes: int = 0
 
@@ -64,7 +66,7 @@ def safe_subdir(subdir: str) -> Path:
     return Path(*cleaned_parts) if cleaned_parts else Path(".")
 
 
-def resolve_output_file(output_dir: Path, relative_path: str) -> Path | None:
+def resolve_output_file(output_dir: Path, relative_path: str) -> Optional[Path]:
     """Return absolute file path if relative_path is safe and file exists under output_dir."""
     if not relative_path or not relative_path.strip():
         return None
@@ -90,8 +92,11 @@ MAX_INLINE_ZIP_BYTES = 4 * 1024 * 1024
 # Keep a safety margin under Vercel's 4.5MB request payload limit.
 UPLOAD_TOTAL_LIMIT_BYTES = 4 * 1024 * 1024
 UPLOAD_FILE_LIMIT_BYTES = 4 * 1024 * 1024
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png"}
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+if HEIC_SUPPORTED:
+    ALLOWED_MIME_TYPES.update({"image/heic", "image/heif"})
 ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
+ALLOWED_FORMATS_DISPLAY = "/".join(ext.replace(".", "").upper() for ext in sorted(ALLOWED_EXTENSIONS) if ext)
 
 # Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
 SESSION_WORKSPACE_KEY = "imgtowebp_ws"
@@ -159,7 +164,7 @@ def is_decodable_raster_image(data: bytes) -> bool:
         return False
 
 
-def normalize_mimetype(raw: str | None) -> str:
+def normalize_mimetype(raw: Optional[str]) -> str:
     return (raw or "").split(";", 1)[0].strip().lower()
 
 
@@ -172,17 +177,17 @@ def validate_upload_payload(
     filename: str,
     ext: str,
     data: bytes,
-    mimetype: str | None,
-) -> str | None:
+    mimetype: Optional[str],
+) -> Optional[str]:
     if not data:
         return "Empty file."
     if len(data) > UPLOAD_FILE_LIMIT_BYTES:
         return f"Single file is too large. Keep each file under {limit_label(UPLOAD_FILE_LIMIT_BYTES)}."
     if ext not in ALLOWED_EXTENSIONS:
-        return "Unsupported file type. Only JPG/JPEG/PNG are allowed."
+        return f"Unsupported file type. Only {ALLOWED_FORMATS_DISPLAY} are allowed."
     normalized_mime = normalize_mimetype(mimetype)
     if normalized_mime and normalized_mime not in ALLOWED_MIME_TYPES:
-        return "Unsupported file type. Please upload a JPG or PNG image."
+        return f"Unsupported file type. Please upload a {ALLOWED_FORMATS_DISPLAY} image."
     if not is_decodable_raster_image(data):
         return "Unsupported or unreadable image."
     return None
@@ -221,6 +226,7 @@ def create_app(output_dir: Path) -> Flask:
         "max_file_bytes": UPLOAD_FILE_LIMIT_BYTES,
         "allowed_mime_types": sorted(ALLOWED_MIME_TYPES),
         "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+        "allowed_formats_label": "/".join(ext.replace(".", "").upper() for ext in sorted(ALLOWED_EXTENSIONS) if ext),
     }
 
     @app.errorhandler(RequestEntityTooLarge)
@@ -253,6 +259,9 @@ def create_app(output_dir: Path) -> Flask:
         quality_raw = request.form.get("quality", str(DEFAULT_QUALITY))
         overwrite = request.form.get("overwrite") == "on"
         subdir = safe_subdir(request.form.get("subdir", ""))
+        output_format = request.form.get("format", "webp").lower()
+        if output_format not in ["webp", "heic"]:
+            output_format = "webp"
 
         try:
             quality = int(quality_raw)
@@ -314,9 +323,10 @@ def create_app(output_dir: Path) -> Flask:
                 )
                 continue
 
-            out_path = target_dir / f"{stem}.webp"
+            out_ext = f".{output_format}"
+            out_path = target_dir / f"{stem}{out_ext}"
 
-            res = convert_image(data, out_path, quality=quality, overwrite=overwrite)
+            res = convert_image(data, out_path, quality=quality, overwrite=overwrite, output_format=output_format)
 
             if res.success:
                 total_in += res.input_size
@@ -363,6 +373,7 @@ def create_app(output_dir: Path) -> Flask:
             "subdir": str(subdir),
             "overwrite": overwrite,
             "quality": quality,
+            "output_format": output_format,
         }
 
         zip_relpaths = [
@@ -399,7 +410,7 @@ def create_app(output_dir: Path) -> Flask:
         zip_relpaths = raw["zip_relpaths"]
         zip_fallback_only = bool(raw["zip_fallback_only"])
 
-        inline_zip_b64: str | None = None
+        inline_zip_b64: Optional[str] = None
         if zip_relpaths and not zip_fallback_only:
             zdata = build_zip_bytes(output_dir, zip_relpaths)
             if len(zdata) <= MAX_INLINE_ZIP_BYTES:
@@ -427,14 +438,15 @@ def create_app(output_dir: Path) -> Flask:
 
     @app.get("/preview/<path:relative_path>")
     def preview_file(relative_path: str):
-        """Inline WebP for list thumbnails (not Content-Disposition: attachment)."""
         path = resolve_output_file(output_dir, relative_path)
         if path is None:
             abort(404)
+        ext = path.suffix.lower()
+        mimetype = "image/heic" if ext in (".heic", ".heif") else "image/webp"
         return send_file(
             path,
             as_attachment=False,
-            mimetype="image/webp",
+            mimetype=mimetype,
             max_age=300,
         )
 
@@ -443,11 +455,13 @@ def create_app(output_dir: Path) -> Flask:
         path = resolve_output_file(output_dir, relative_path)
         if path is None:
             abort(404)
+        ext = path.suffix.lower()
+        mimetype = "image/heic" if ext in (".heic", ".heif") else "image/webp"
         return send_file(
             path,
             as_attachment=True,
             download_name=path.name,
-            mimetype="image/webp",
+            mimetype=mimetype,
         )
 
     @app.post("/download-zip")

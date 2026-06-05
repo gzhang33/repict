@@ -102,13 +102,10 @@
       id="mainForm"
       class="min-h-screen flex flex-col"
     >
-      <!-- Navbar: hidden form fields only (no visible chrome) -->
+      <!-- Navbar: empty header -->
       <header
         class="fixed top-0 left-0 right-0 z-40 p-6 flex justify-end items-center pointer-events-none"
       >
-        <div class="pointer-events-auto">
-          <input type="hidden" name="quality" value="100" />
-        </div>
       </header>
 
       <!-- Main Content -->
@@ -137,10 +134,38 @@
             </div>
           </div>
 
+          <!-- Settings Panel -->
+          <div class="glass-panel rounded-3xl border border-slate-200 p-6 flex flex-wrap gap-6 items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-semibold text-slate-700">Output Format:</span>
+              <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50" role="radiogroup" aria-label="Output format">
+                <button type="button" id="formatWebpBtn" role="radio" aria-checked="true" class="px-4 py-1.5 rounded-md text-xs font-semibold bg-white text-slate-800 shadow-sm border border-slate-200/50 transition-all focus:outline-none">WebP</button>
+                <button type="button" id="formatHeicBtn" role="radio" aria-checked="false" class="px-4 py-1.5 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-800 transition-all focus:outline-none">HEIC</button>
+              </div>
+              <input type="hidden" name="format" id="formatInput" value="webp" />
+            </div>
+            
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-semibold text-slate-700">Quality:</span>
+              <div class="flex items-center gap-2">
+                <input type="range" name="quality" id="qualityRange" min="10" max="100" value="90" class="w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600" />
+                <span id="qualityVal" class="text-xs font-bold text-slate-600 w-8">90%</span>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <input type="checkbox" name="overwrite" id="overwrite" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 h-4 w-4 cursor-pointer" checked />
+              <label for="overwrite" class="text-xs font-medium text-slate-600 select-none cursor-pointer">Overwrite existing files</label>
+            </div>
+          </div>
+
           <!-- Drop Zone -->
           <div
             id="dropZone"
-            class="group relative w-full aspect-[2/1] md:aspect-[3/1] bg-white border-4 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:border-brand-400 hover:bg-brand-50/10 hover:shadow-xl hover:shadow-brand-500/5 hover:-translate-y-1 overflow-hidden"
+            tabindex="0"
+            role="button"
+            aria-label="Upload files"
+            class="group relative w-full aspect-[2/1] md:aspect-[3/1] bg-white border-4 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:border-brand-400 hover:bg-brand-50/10 hover:shadow-xl hover:shadow-brand-500/5 hover:-translate-y-1 overflow-hidden focus:outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/20"
           >
             <input
               type="file"
@@ -180,15 +205,15 @@
                 Drop images here
               </h2>
               <p class="text-slate-500 text-lg">or click to browse</p>
-              <div class="mt-8 flex gap-3">
+              <div class="mt-8 flex gap-3 flex-wrap justify-center">
+                {% for ext in upload_policy.allowed_extensions %}
+                {% if ext %}
                 <span
                   class="px-3 py-1 bg-slate-100 rounded-full text-slate-500 text-xs font-semibold uppercase tracking-wide"
-                  >JPG</span
+                  >{{ ext.replace('.', '') }}</span
                 >
-                <span
-                  class="px-3 py-1 bg-slate-100 rounded-full text-slate-500 text-xs font-semibold uppercase tracking-wide"
-                  >PNG</span
-                >
+                {% endif %}
+                {% endfor %}
               </div>
             </div>
 
@@ -214,7 +239,7 @@
 
           <div class="w-full max-w-3xl mx-auto space-y-2">
             <p class="text-xs text-slate-500 text-center">
-              Upload policy: JPG/JPEG/PNG only, up to {{ (upload_policy.max_total_bytes / (1024 * 1024)) | int }} MB total.
+              Upload policy: {{ upload_policy.allowed_formats_label }} only, up to {{ (upload_policy.max_total_bytes / (1024 * 1024)) | int }} MB total.
             </p>
             {% if form_error %}
             <div
@@ -919,7 +944,7 @@
           const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
           if (!selectedFiles.length) {
             e.preventDefault();
-            setFormError("Please select at least one JPG or PNG image.");
+            setFormError("Please select at least one supported image (" + uploadPolicy.allowed_formats_label + ").");
             return;
           }
           if (maxTotalBytes > 0 && totalBytes > maxTotalBytes) {
@@ -987,6 +1012,14 @@
           // Layout: Grid covers Empty State. Overlay covers Grid on Hover.
           // Let's just trigger file input.
           fileInput.click();
+        });
+
+        // Keyboard activation
+        dropZone.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInput.click();
+          }
         });
 
         // Drag Enter / Over
@@ -1120,6 +1153,37 @@
           actionBar.classList.remove("translate-y-24", "opacity-0", "scale-95");
         }
       }
+
+      // Settings Panel Controls
+      (function() {
+        const formatWebpBtn = document.getElementById("formatWebpBtn");
+        const formatHeicBtn = document.getElementById("formatHeicBtn");
+        const formatInput = document.getElementById("formatInput");
+        if (formatWebpBtn && formatHeicBtn && formatInput) {
+          formatWebpBtn.addEventListener("click", () => {
+            formatInput.value = "webp";
+            formatWebpBtn.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-white text-slate-800 shadow-sm border border-slate-200/50 transition-all focus:outline-none";
+            formatWebpBtn.setAttribute("aria-checked", "true");
+            formatHeicBtn.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-800 transition-all focus:outline-none";
+            formatHeicBtn.setAttribute("aria-checked", "false");
+          });
+          formatHeicBtn.addEventListener("click", () => {
+            formatInput.value = "heic";
+            formatHeicBtn.className = "px-4 py-1.5 rounded-md text-xs font-semibold bg-white text-slate-800 shadow-sm border border-slate-200/50 transition-all focus:outline-none";
+            formatHeicBtn.setAttribute("aria-checked", "true");
+            formatWebpBtn.className = "px-4 py-1.5 rounded-md text-xs font-semibold text-slate-500 hover:text-slate-800 transition-all focus:outline-none";
+            formatWebpBtn.setAttribute("aria-checked", "false");
+          });
+        }
+
+        const qualityRange = document.getElementById("qualityRange");
+        const qualityVal = document.getElementById("qualityVal");
+        if (qualityRange && qualityVal) {
+          qualityRange.addEventListener("input", (e) => {
+            qualityVal.textContent = `${e.target.value}%`;
+          });
+        }
+      })();
     </script>
   </body>
 </html>
