@@ -163,6 +163,8 @@
               <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50" role="radiogroup" aria-label="Output format">
                 <button type="button" id="formatWebpBtn" role="radio" aria-checked="true" class="btn-format active">WebP</button>
                 <button type="button" id="formatHeicBtn" role="radio" aria-checked="false" class="btn-format">HEIC</button>
+                <button type="button" id="formatJpegBtn" role="radio" aria-checked="false" class="btn-format">JPEG</button>
+                <button type="button" id="formatPngBtn" role="radio" aria-checked="false" class="btn-format">PNG</button>
               </div>
               <input type="hidden" name="format" id="formatInput" value="webp" />
             </div>
@@ -1167,9 +1169,11 @@
       (function() {
         const formatWebpBtn = document.getElementById("formatWebpBtn");
         const formatHeicBtn = document.getElementById("formatHeicBtn");
+        const formatJpegBtn = document.getElementById("formatJpegBtn");
+        const formatPngBtn = document.getElementById("formatPngBtn");
         const formatInput = document.getElementById("formatInput");
-        const btns = [formatWebpBtn, formatHeicBtn];
-        const values = [formatWebpBtn ? "webp" : null, formatHeicBtn ? "heic" : null];
+        const btns = [formatWebpBtn, formatHeicBtn, formatJpegBtn, formatPngBtn];
+        const values = ["webp", "heic", "jpeg", "png"];
 
         btns.forEach((btn, i) => {
           if (!btn) return;

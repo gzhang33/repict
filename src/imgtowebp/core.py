@@ -24,8 +24,18 @@ class ConversionResult:
     output_size: int = 0
     saved_bytes: int = 0
 
-def ensure_compatible_mode(img: Image.Image) -> Image.Image:
-    """Ensure the image is in a mode compatible with WebP/HEIC (RGB or RGBA)."""
+def ensure_compatible_mode(img: Image.Image, output_format: str = "webp") -> Image.Image:
+    """Ensure the image is in a mode compatible with the target output format."""
+    # JPEG does not support alpha — strip transparency
+    if output_format.lower() in ("jpeg", "jpg"):
+        if img.mode == "RGBA":
+            # Composite onto white background to preserve appearance
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            return bg
+        if img.mode != "RGB":
+            return img.convert("RGB")
+        return img
     if img.mode in ("RGB", "RGBA"):
         return img
     if "A" in img.getbands():
@@ -67,15 +77,20 @@ def convert_image(
             img = Image.open(io.BytesIO(input_data))
 
         fmt = output_format.lower()
-        if fmt == "heic" or fmt == "heif":
-            if not HEIC_SUPPORTED:
-                return ConversionResult(False, "HEIC/HEIF conversion is not supported. Please install pillow-heif.")
+        if fmt == "jpg":
+            fmt = "jpeg"
 
         with img:
-            converted_img = ensure_compatible_mode(img)
+            converted_img = ensure_compatible_mode(img, output_format=fmt)
             try:
-                if fmt == "heic" or fmt == "heif":
+                if fmt in ("heic", "heif"):
+                    if not HEIC_SUPPORTED:
+                        return ConversionResult(False, "HEIC/HEIF conversion is not supported. Please install pillow-heif.")
                     converted_img.save(output_path, "HEIF", quality=quality)
+                elif fmt == "jpeg":
+                    converted_img.save(output_path, "JPEG", quality=quality)
+                elif fmt == "png":
+                    converted_img.save(output_path, "PNG")
                 else:
                     converted_img.save(output_path, "WEBP", quality=quality, method=6)
             finally:

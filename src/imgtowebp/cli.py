@@ -66,13 +66,13 @@ def print_summary(stats: ConversionStats, format_name: str = "webp") -> None:
         print(f"  Deleted bytes (originals): {format_bytes(stats.total_deleted_bytes)}")
 
 def run_cli() -> None:
-    parser = argparse.ArgumentParser(description="Batch convert images to WebP or HEIC.")
+    parser = argparse.ArgumentParser(description="Batch convert images between formats.")
     parser.add_argument("--dir", default=".", help="Target directory (default: current).")
     parser.add_argument("--quality", type=int, default=DEFAULT_QUALITY, help=f"Quality 0-100 (default: {DEFAULT_QUALITY}).")
     parser.add_argument("--no-recursive", action="store_true", help="Do not scan subdirectories.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files.")
     parser.add_argument("--replace", action="store_true", help="Delete original image after conversion.")
-    parser.add_argument("--format", default="webp", choices=["webp", "heic"], help="Output format: webp or heic (default: webp).")
+    parser.add_argument("--format", default="webp", choices=["webp", "heic", "jpeg", "jpg", "png"], help="Output format (default: webp).")
     
     args = parser.parse_args()
     directory = Path(args.dir).resolve()
@@ -89,6 +89,8 @@ def run_cli() -> None:
         sys.exit(1)
 
     fmt_name = args.format.lower()
+    if fmt_name == "jpg":
+        fmt_name = "jpeg"
     stats = ConversionStats()
     
     # Count all scanned files recursively if recursive is enabled
