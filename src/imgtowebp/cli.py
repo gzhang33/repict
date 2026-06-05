@@ -43,12 +43,12 @@ def iter_images(directory: Path, recursive: bool) -> Iterable[Path]:
         if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
             yield path
 
-def print_summary(stats: ConversionStats) -> None:
+def print_summary(stats: ConversionStats, format_name: str = "webp") -> None:
     print("\nSummary:")
     print(f"  Scanned files: {stats.scanned}")
     print(f"  Eligible images: {stats.eligible}")
     print(f"  Converted: {stats.converted}")
-    print(f"  Skipped (existing webp): {stats.skipped_existing}")
+    print(f"  Skipped (existing {format_name}): {stats.skipped_existing}")
     print(f"  Deleted originals: {stats.deleted_originals}")
     print(f"  Failed: {stats.failed}")
 
@@ -59,40 +59,52 @@ def print_summary(stats: ConversionStats) -> None:
         saved_pct = (delta_b / before_b * 100.0) if before_b > 0 else 0.0
         
         print(f"  Total size before (converted): {format_bytes(before_b)}")
-        print(f"  Total size after  (webp):      {format_bytes(after_b)}")
+        print(f"  Total size after  ({format_name}):      {format_bytes(after_b)}")
         print(f"  Saved: {format_bytes(delta_b)} ({saved_pct:.2f}%)")
     
     if stats.deleted_originals > 0:
         print(f"  Deleted bytes (originals): {format_bytes(stats.total_deleted_bytes)}")
 
 def run_cli() -> None:
-    parser = argparse.ArgumentParser(description="Batch convert images to WebP.")
+    parser = argparse.ArgumentParser(description="Batch convert images to WebP or HEIC.")
     parser.add_argument("--dir", default=".", help="Target directory (default: current).")
     parser.add_argument("--quality", type=int, default=DEFAULT_QUALITY, help=f"Quality 0-100 (default: {DEFAULT_QUALITY}).")
     parser.add_argument("--no-recursive", action="store_true", help="Do not scan subdirectories.")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing .webp files.")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing output files.")
     parser.add_argument("--replace", action="store_true", help="Delete original image after conversion.")
+    parser.add_argument("--format", default="webp", choices=["webp", "heic"], help="Output format: webp or heic (default: webp).")
     
     args = parser.parse_args()
     directory = Path(args.dir).resolve()
     
+    if not directory.exists():
+        print(f"Error: Target path does not exist: {directory}", file=sys.stderr)
+        sys.exit(1)
+    if not directory.is_dir():
+        print(f"Error: Target path is not a directory: {directory}", file=sys.stderr)
+        sys.exit(1)
+
     if not (0 <= args.quality <= 100):
         print("Error: --quality must be between 0 and 100", file=sys.stderr)
         sys.exit(1)
 
+    fmt_name = args.format.lower()
     stats = ConversionStats()
-    # Simple scanned count for all files in directory
-    stats.scanned = len([f for f in directory.iterdir() if f.is_file()])
+    
+    # Count all scanned files recursively if recursive is enabled
+    iterator = directory.rglob("*") if not args.no_recursive else directory.glob("*")
+    stats.scanned = sum(1 for p in iterator if p.is_file())
 
     for src_path in iter_images(directory, not args.no_recursive):
         stats.eligible += 1
-        dst_path = src_path.with_suffix(".webp")
+        dst_path = src_path.with_suffix(f".{fmt_name}")
 
         res = convert_image(
             src_path,
             dst_path,
             quality=args.quality,
-            overwrite=args.overwrite
+            overwrite=args.overwrite,
+            output_format=fmt_name
         )
 
         if res.success:
@@ -113,21 +125,21 @@ def run_cli() -> None:
         else:
             if "exists" in res.message:
                 stats.skipped_existing += 1
-                # If we want to replace even if webp already exists
+                # If we want to replace even if output already exists
                 if args.replace:
                     try:
                         src_size = src_path.stat().st_size
                         src_path.unlink()
                         stats.deleted_originals += 1
                         stats.total_deleted_bytes += src_size
-                        print(f"Deleted original (WebP exists): {src_path.name}")
+                        print(f"Deleted original ({fmt_name.upper()} exists): {src_path.name}")
                     except Exception as e:
                         print(f"Failed to delete {src_path.name}: {e}")
             else:
                 stats.failed += 1
                 print(f"Failed {src_path.name}: {res.message}")
 
-    print_summary(stats)
+    print_summary(stats, fmt_name)
 
 if __name__ == "__main__":
     run_cli()

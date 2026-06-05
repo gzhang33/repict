@@ -1,9 +1,19 @@
 import io
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
 from PIL import Image
 
-SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIC_SUPPORTED = True
+except ImportError:
+    HEIC_SUPPORTED = False
+
+SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+if HEIC_SUPPORTED:
+    SUPPORTED_EXTENSIONS.update({".heic", ".heif"})
 DEFAULT_QUALITY = 100
 
 @dataclass
@@ -15,7 +25,7 @@ class ConversionResult:
     saved_bytes: int = 0
 
 def ensure_webp_compatible_mode(img: Image.Image) -> Image.Image:
-    """Ensure the image is in a mode compatible with WebP (RGB or RGBA)."""
+    """Ensure the image is in a mode compatible with WebP/HEIC (RGB or RGBA)."""
     if img.mode in ("RGB", "RGBA"):
         return img
     if "A" in img.getbands():
@@ -35,10 +45,11 @@ def format_bytes(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 def convert_image(
-    input_data: bytes | Path,
+    input_data: Union[bytes, Path],
     output_path: Path,
     quality: int = DEFAULT_QUALITY,
     overwrite: bool = False,
+    output_format: str = "webp",
 ) -> ConversionResult:
     """
     Core image conversion logic.
@@ -55,9 +66,21 @@ def convert_image(
             input_size = len(input_data)
             img = Image.open(io.BytesIO(input_data))
 
+        fmt = output_format.lower()
+        if fmt == "heic" or fmt == "heif":
+            if not HEIC_SUPPORTED:
+                return ConversionResult(False, "HEIC/HEIF conversion is not supported. Please install pillow-heif.")
+
         with img:
-            img = ensure_webp_compatible_mode(img)
-            img.save(output_path, "WEBP", quality=quality, method=6)
+            converted_img = ensure_webp_compatible_mode(img)
+            try:
+                if fmt == "heic" or fmt == "heif":
+                    converted_img.save(output_path, "HEIF", quality=quality)
+                else:
+                    converted_img.save(output_path, "WEBP", quality=quality, method=6)
+            finally:
+                if converted_img is not img:
+                    converted_img.close()
 
         output_size = output_path.stat().st_size
         saved_bytes = input_size - output_size
