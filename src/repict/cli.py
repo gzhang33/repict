@@ -15,10 +15,10 @@ try:
 except ImportError:
     # If relative import fails, add src directory to path
     current_dir = Path(__file__).parent
-    # From src/imgtowebp/cli.py, go up to src/
+    # From src/repict/cli.py, go up to src/
     src_dir = current_dir.parent
     sys.path.insert(0, str(src_dir))
-    from imgtowebp.core import (
+    from repict.core import (
         SUPPORTED_EXTENSIONS,
         DEFAULT_QUALITY,
         convert_image,

@@ -17,8 +17,8 @@ dependencies = [
 ]
 
 [project.scripts]
-repict = "imgtowebp.cli:run_cli"
-repict-web = "imgtowebp.web.app:run_web"
+repict = "repict.cli:run_cli"
+repict-web = "repict.web.app:run_web"
 
 [tool.setuptools.packages.find]
 where = ["src"]

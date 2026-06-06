@@ -4,8 +4,8 @@ import os
 # Add src to path so we can import repict without installing
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
 
-from imgtowebp.cli import run_cli
-from imgtowebp.web.app import run_web
+from repict.cli import run_cli
+from repict.web.app import run_web
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "web":

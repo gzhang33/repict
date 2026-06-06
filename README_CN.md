@@ -96,7 +96,7 @@ python main.py web --host 0.0.0.0 --port 5000
 #### 直接运行 Web 应用
 
 ```bash
-python src/imgtowebp/web/app.py --port 5000
+python src/repict/web/app.py --port 5000
 ```
 
 #### 安装后使用 Web 工具
@@ -136,9 +136,9 @@ repict-web --port 5000
 ## 项目结构
 
 ```
-imgtowebp/
+repict/
 ├── src/
-│   └── imgtowebp/
+│   └── repict/
 │       ├── __init__.py
 │       ├── core.py          # 核心转换逻辑
 │       ├── cli.py           # 命令行工具

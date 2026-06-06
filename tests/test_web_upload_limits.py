@@ -10,8 +10,8 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from imgtowebp.web.app import create_app, validate_upload_payload, ALLOWED_FORMATS_DISPLAY  # noqa: E402
-from imgtowebp.core import HEIC_SUPPORTED
+from repict.web.app import create_app, validate_upload_payload, ALLOWED_FORMATS_DISPLAY  # noqa: E402
+from repict.core import HEIC_SUPPORTED
 
 
 class UploadValidationTests(unittest.TestCase):
@@ -84,7 +84,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_rgb_to_webp(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.webp"
@@ -96,7 +96,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_rgb_to_jpeg(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.jpeg"
@@ -108,7 +108,7 @@ class ConversionTests(unittest.TestCase):
                 self.assertEqual(img.mode, "RGB")
 
     def test_convert_jpg_alias_to_jpeg(self):
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.jpg"
@@ -118,7 +118,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_rgba_to_jpeg_strips_alpha(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgba_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.jpeg"
@@ -130,7 +130,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_rgb_to_png(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.png"
@@ -142,7 +142,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_rgba_to_png_preserves_alpha(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgba_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.png"
@@ -154,7 +154,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_png_to_jpeg(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_png_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.jpeg"
@@ -167,7 +167,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_webp_to_jpeg(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_webp_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.jpeg"
@@ -180,7 +180,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_webp_to_png(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_webp_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.png"
@@ -192,7 +192,7 @@ class ConversionTests(unittest.TestCase):
 
     def test_convert_jpeg_to_png(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "test.png"
@@ -205,7 +205,7 @@ class ConversionTests(unittest.TestCase):
     @unittest.skipUnless(HEIC_SUPPORTED, "HEIC/HEIF is not supported in this environment")
     def test_convert_to_heic(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         data = self._make_rgb_image()
         with tempfile.TemporaryDirectory() as tmp:
             out_path = Path(tmp) / "test.heic"
@@ -218,7 +218,7 @@ class ConversionTests(unittest.TestCase):
     @unittest.skipUnless(HEIC_SUPPORTED, "HEIC/HEIF is not supported in this environment")
     def test_convert_heic_to_jpeg(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         # Create a HEIC image first, then convert to JPEG
         img = Image.new("RGB", (50, 50), color="yellow")
         buf = io.BytesIO()
@@ -236,7 +236,7 @@ class ConversionTests(unittest.TestCase):
     @unittest.skipUnless(HEIC_SUPPORTED, "HEIC/HEIF is not supported in this environment")
     def test_convert_heic_to_png(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         img = Image.new("RGB", (50, 50), color="cyan")
         buf = io.BytesIO()
         img.save(buf, format="HEIF")
@@ -250,7 +250,7 @@ class ConversionTests(unittest.TestCase):
     @unittest.skipUnless(HEIC_SUPPORTED, "HEIC/HEIF is not supported in this environment")
     def test_convert_heic_to_webp(self):
         from PIL import Image
-        from imgtowebp.core import convert_image
+        from repict.core import convert_image
         img = Image.new("RGB", (50, 50), color="magenta")
         buf = io.BytesIO()
         img.save(buf, format="HEIF")

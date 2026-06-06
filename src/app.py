@@ -7,7 +7,7 @@ _SRC_ROOT = Path(__file__).resolve().parent
 if str(_SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(_SRC_ROOT))
 
-from imgtowebp.web.app import create_app
+from repict.web.app import create_app
 
 _output_dir = Path(os.environ.get("REPICT_OUTPUT", "/tmp/repict_output")).resolve()
 app = create_app(_output_dir)

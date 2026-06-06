@@ -96,7 +96,7 @@ python main.py web --host 0.0.0.0 --port 5000
 #### Run Web Application Directly
 
 ```bash
-python src/imgtowebp/web/app.py --port 5000
+python src/repict/web/app.py --port 5000
 ```
 
 #### Using Web Tool After Installation
@@ -136,9 +136,9 @@ Visit `http://localhost:5000` to use the Web UI.
 ## Project Structure
 
 ```
-imgtowebp/
+repict/
 ├── src/
-│   └── imgtowebp/
+│   └── repict/
 │       ├── __init__.py
 │       ├── core.py          # Core conversion logic
 │       ├── cli.py           # Command-line tool
