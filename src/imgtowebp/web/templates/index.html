@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>img2webp — Convert</title>
+    <title>repict — Convert</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <!-- Vercel Web Analytics -->
     <script>
@@ -111,7 +111,7 @@
           <!-- Title — Swiss editorial, left-aligned -->
           <div>
             <h1 class="font-serif text-5xl md:text-6xl text-ink leading-none mb-5">
-              Image Converter.
+              repict.
             </h1>
             <p class="text-[15px] text-ink-muted leading-relaxed max-w-lg">
               Drag files in. Choose output format.
@@ -457,7 +457,7 @@
                 var blob = new Blob([bytes], { type: "application/zip" });
                 var a = document.createElement("a");
                 a.href = URL.createObjectURL(blob);
-                a.download = "imgtowebp-images.zip";
+                a.download = "repict-images.zip";
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);

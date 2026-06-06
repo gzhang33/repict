@@ -18,6 +18,6 @@ env/
 .vscode/
 .idea/
 
-# Ignore webp output files but keep folder structure
-webp_output/*
-!webp_output/.gitkeep
+# Ignore output files but keep folder structure
+output/*
+!output/.gitkeep

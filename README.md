@@ -1,18 +1,19 @@
-# imgtowebp
+# repict
 
 English| [中文](README_CN.md)
 
-A simple and easy-to-use image to WebP converter tool that supports both command-line and Web UI interfaces.
+A simple and easy-to-use image format converter tool that supports WebP, HEIC, JPEG, and PNG output via CLI or Web UI.
 
 ![Web UI Preview](docs/assets/screenshots/preview-hero.png)
 
 ## Features
 
-- 🖼️ Batch convert JPG/JPEG/PNG images to WebP format
+- 🖼️ Batch convert images to WebP, HEIC, JPEG, or PNG format
 - 📦 Recursive directory scanning support
 - 🎨 Customizable quality parameter (0-100)
 - 🌐 Web UI interface with drag-and-drop upload
-- 💾 Option to overwrite existing WebP files
+- 🔄 Cross-format conversion (e.g., PNG → WebP, JPEG → HEIC)
+- 💾 Option to overwrite existing output files
 - 🗑️ Option to delete original images after conversion
 - 📊 Display conversion statistics and file size optimization
 
@@ -23,7 +24,7 @@ A simple and easy-to-use image to WebP converter tool that supports both command
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd imgtowebp
+cd repict
 
 # Install dependencies
 pip install -r requirements.txt
@@ -71,7 +72,7 @@ python main.py --dir ./images --replace
 If installed via `pip install .`, you can use directly:
 
 ```bash
-imgtowebp --dir ./images --quality 85
+repict --dir ./images --quality 85
 ```
 
 ### Web UI Mode
@@ -86,7 +87,7 @@ python main.py web
 python main.py web --port 8080
 
 # Specify output directory
-python main.py web --output-dir ./webp_output
+python main.py web --output-dir ./output
 
 # Specify host and port
 python main.py web --host 0.0.0.0 --port 5000
@@ -101,7 +102,7 @@ python src/imgtowebp/web/app.py --port 5000
 #### Using Web Tool After Installation
 
 ```bash
-imgtowebp-web --port 5000
+repict-web --port 5000
 ```
 
 #### Web UI Features
@@ -121,16 +122,16 @@ Visit `http://localhost:5000` to use the Web UI.
 ### CLI Mode Arguments
 
 - `--dir DIR`: Target directory (default: current directory)
-- `--quality QUALITY`: WebP quality 0-100 (default: 80)
+- `--quality QUALITY`: Output quality 0-100 (default: 80)
 - `--no-recursive`: Do not scan subdirectories recursively
-- `--overwrite`: Overwrite existing WebP files
+- `--overwrite`: Overwrite existing output files
 - `--replace`: Delete original image files after conversion
 
 ### Web Mode Arguments
 
 - `--host HOST`: Server host address (default: 127.0.0.1)
 - `--port PORT`: Server port (default: 5000)
-- `--output-dir OUTPUT_DIR`: Output directory (default: webp_output)
+- `--output-dir OUTPUT_DIR`: Output directory (default: output)
 
 ## Project Structure
 

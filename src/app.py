@@ -9,5 +9,5 @@ if str(_SRC_ROOT) not in sys.path:
 
 from imgtowebp.web.app import create_app
 
-_output_dir = Path(os.environ.get("IMGTOWEBP_OUTPUT", "/tmp/imgtowebp_output")).resolve()
+_output_dir = Path(os.environ.get("REPICT_OUTPUT", "/tmp/repict_output")).resolve()
 app = create_app(_output_dir)

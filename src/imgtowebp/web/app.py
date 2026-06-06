@@ -99,11 +99,11 @@ ALLOWED_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
 ALLOWED_FORMATS_DISPLAY = "/".join(ext.replace(".", "").upper() for ext in sorted(ALLOWED_EXTENSIONS) if ext)
 
 # Ephemeral Web UI output: each browser session writes under output_dir/_sessions/<id>/.
-SESSION_WORKSPACE_KEY = "imgtowebp_ws"
+SESSION_WORKSPACE_KEY = "repict_ws"
 SESSIONS_DIRNAME = "_sessions"
 # One-shot conversion payload for PRG: GET / consumes it; refresh hits empty session -> GET /.
-SESSION_RESULTS_ONCE_KEY = "imgtowebp_results_once"
-SESSION_FORM_ERROR_ONCE_KEY = "imgtowebp_form_error_once"
+SESSION_RESULTS_ONCE_KEY = "repict_results_once"
+SESSION_FORM_ERROR_ONCE_KEY = "repict_form_error_once"
 
 
 def _is_safe_workspace_id(workspace_id: str) -> bool:
@@ -227,7 +227,7 @@ def create_app(output_dir: Path) -> Flask:
     app.config["MAX_CONTENT_LENGTH"] = UPLOAD_TOTAL_LIMIT_BYTES
     app.secret_key = (
         os.environ.get("FLASK_SECRET_KEY")
-        or os.environ.get("IMGTOWEBP_SECRET_KEY")
+        or os.environ.get("REPICT_SECRET_KEY")
         or secrets.token_hex(32)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -479,16 +479,16 @@ def create_app(output_dir: Path) -> Flask:
             buffer,
             mimetype="application/zip",
             as_attachment=True,
-            download_name="imgtowebp-images.zip",
+            download_name="repict-images.zip",
         )
 
     return app
 
 def run_web() -> None:
-    parser = argparse.ArgumentParser(description="Web UI for WebP conversion.")
+    parser = argparse.ArgumentParser(description="Repict — Web UI for image format conversion.")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
-    parser.add_argument("--output-dir", default="webp_output", help="Output directory.")
+    parser.add_argument("--output-dir", default="output", help="Output directory.")
     
     args = parser.parse_args()
     app = create_app(Path(args.output_dir).resolve())

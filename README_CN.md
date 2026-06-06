@@ -1,18 +1,19 @@
-# imgtowebp
+# repict
 
 [English](README.md) | 中文
 
-一个简单易用的图片转 WebP 格式工具，支持命令行和 Web UI 两种使用方式。
+一个简单易用的图片格式转换工具，支持 WebP、HEIC、JPEG、PNG 输出，提供命令行和 Web UI 两种使用方式。
 
 ![Web UI 预览](docs/assets/screenshots/preview-hero.png)
 
 ## 功能特性
 
-- 🖼️ 支持批量转换 JPG/JPEG/PNG 图片为 WebP 格式
+- 🖼️ 支持批量转换图片为 WebP、HEIC、JPEG 或 PNG 格式
 - 📦 支持递归扫描子目录
 - 🎨 可自定义质量参数（0-100）
 - 🌐 提供 Web UI 界面，支持拖拽上传
-- 💾 可选择是否覆盖已存在的 WebP 文件
+- 🔄 支持跨格式转换（如 PNG → WebP、JPEG → HEIC）
+- 💾 可选择是否覆盖已存在的输出文件
 - 🗑️ 支持转换后删除原始图片
 - 📊 显示转换统计信息和文件大小优化情况
 
@@ -23,7 +24,7 @@
 ```bash
 # 克隆仓库
 git clone <repository-url>
-cd imgtowebp
+cd repict
 
 # 安装依赖
 pip install -r requirements.txt
@@ -71,7 +72,7 @@ python main.py --dir ./images --replace
 如果已通过 `pip install .` 安装，可以直接使用：
 
 ```bash
-imgtowebp --dir ./images --quality 85
+repict --dir ./images --quality 85
 ```
 
 ### Web UI 模式
@@ -86,7 +87,7 @@ python main.py web
 python main.py web --port 8080
 
 # 指定输出目录
-python main.py web --output-dir ./webp_output
+python main.py web --output-dir ./output
 
 # 指定主机和端口
 python main.py web --host 0.0.0.0 --port 5000
@@ -101,7 +102,7 @@ python src/imgtowebp/web/app.py --port 5000
 #### 安装后使用 Web 工具
 
 ```bash
-imgtowebp-web --port 5000
+repict-web --port 5000
 ```
 
 #### Web UI 功能
@@ -121,16 +122,16 @@ imgtowebp-web --port 5000
 ### CLI 模式参数
 
 - `--dir DIR`: 目标目录（默认：当前目录）
-- `--quality QUALITY`: WebP 质量 0-100（默认：80）
+- `--quality QUALITY`: 输出质量 0-100（默认：80）
 - `--no-recursive`: 不递归扫描子目录
-- `--overwrite`: 覆盖已存在的 WebP 文件
+- `--overwrite`: 覆盖已存在的输出文件
 - `--replace`: 转换后删除原始图片文件
 
 ### Web 模式参数
 
 - `--host HOST`: 服务器主机地址（默认：127.0.0.1）
 - `--port PORT`: 服务器端口（默认：5000）
-- `--output-dir OUTPUT_DIR`: 输出目录（默认：webp_output）
+- `--output-dir OUTPUT_DIR`: 输出目录（默认：output）
 
 ## 项目结构
 
